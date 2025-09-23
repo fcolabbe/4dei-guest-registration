@@ -1,5 +1,6 @@
 -- =====================================================
--- 🗄️ ESQUEMA DE BASE DE DATOS - 4DEI GUEST REGISTRATION
+-- 🗄️ ESQUEMA SEGURO DE BASE DE DATOS - 4DEI GUEST REGISTRATION
+-- Compatible con MySQL 5.7+ y 8.0+
 -- =====================================================
 
 -- Crear base de datos
@@ -80,6 +81,48 @@ CREATE TABLE IF NOT EXISTS events (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- =====================================================
+-- 🔧 ÍNDICES ADICIONALES (Creación segura)
+-- =====================================================
+
+-- Procedimiento para crear índices de forma segura
+DELIMITER //
+
+CREATE PROCEDURE CreateIndexIfNotExists(
+    IN table_name VARCHAR(128),
+    IN index_name VARCHAR(128), 
+    IN index_columns VARCHAR(255)
+)
+BEGIN
+    DECLARE index_exists INT DEFAULT 0;
+    
+    SELECT COUNT(*) INTO index_exists 
+    FROM information_schema.statistics 
+    WHERE table_schema = DATABASE()
+    AND table_name = table_name 
+    AND index_name = index_name;
+    
+    IF index_exists = 0 THEN
+        SET @sql = CONCAT('CREATE INDEX ', index_name, ' ON ', table_name, ' (', index_columns, ')');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+        SELECT CONCAT('✅ Índice creado: ', index_name) as result;
+    ELSE
+        SELECT CONCAT('⚠️ Índice ya existe: ', index_name) as result;
+    END IF;
+END //
+
+DELIMITER ;
+
+-- Crear índices adicionales de forma segura
+CALL CreateIndexIfNotExists('guests', 'idx_guests_name_company', 'name, company');
+CALL CreateIndexIfNotExists('attendance', 'idx_attendance_guest_time', 'guest_id, check_in_time');
+CALL CreateIndexIfNotExists('guests', 'idx_guests_created_at', 'created_at');
+
+-- Limpiar el procedimiento temporal
+DROP PROCEDURE CreateIndexIfNotExists;
+
+-- =====================================================
 -- 🔍 VISTAS ÚTILES
 -- =====================================================
 
@@ -147,6 +190,13 @@ CREATE PROCEDURE IF NOT EXISTS CheckInGuest(
 BEGIN
     DECLARE v_guest_id INT;
     DECLARE v_existing_count INT;
+    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+    
+    START TRANSACTION;
     
     -- Buscar el invitado
     SELECT id INTO v_guest_id 
@@ -172,6 +222,8 @@ BEGIN
     INSERT INTO attendance (guest_id, qr_code, device_info, location, notes)
     VALUES (v_guest_id, p_qr_code, p_device_info, p_location, p_notes);
     
+    COMMIT;
+    
     -- Retornar información del invitado
     SELECT 
         g.*,
@@ -188,16 +240,6 @@ END //
 DELIMITER ;
 
 -- =====================================================
--- 🔧 ÍNDICES ADICIONALES PARA PERFORMANCE
--- =====================================================
-
--- Índices compuestos para consultas frecuentes
--- Nota: Se crean solo si no existen (manejado por la aplicación)
-CREATE INDEX idx_guests_name_company ON guests(name, company);
-CREATE INDEX idx_attendance_guest_time ON attendance(guest_id, check_in_time);
-CREATE INDEX idx_guests_created_at ON guests(created_at);
-
--- =====================================================
 -- 📝 DATOS DE EJEMPLO (OPCIONAL)
 -- =====================================================
 
@@ -210,23 +252,23 @@ VALUES (1, '4DEI Foro - Distrito de Emprendimiento e Innovación',
         'active');
 
 -- =====================================================
--- 🔒 USUARIOS Y PERMISOS (OPCIONAL)
--- =====================================================
-
--- Crear usuario específico para la aplicación (recomendado para producción)
--- CREATE USER IF NOT EXISTS 'guest_app'@'localhost' IDENTIFIED BY 'secure_password_here';
--- GRANT SELECT, INSERT, UPDATE, DELETE ON guest_registration.* TO 'guest_app'@'localhost';
--- FLUSH PRIVILEGES;
-
--- =====================================================
 -- ✅ VERIFICACIÓN DE INSTALACIÓN
 -- =====================================================
 
 -- Mostrar tablas creadas
+SELECT '📋 Tablas creadas:' as info;
 SHOW TABLES;
 
 -- Mostrar estadísticas iniciales
+SELECT '📊 Estadísticas iniciales:' as info;
 SELECT 'Installation completed successfully' as status;
 SELECT COUNT(*) as total_guests FROM guests;
 SELECT COUNT(*) as total_attendance FROM attendance;
 SELECT COUNT(*) as total_events FROM events;
+
+-- Mostrar índices creados
+SELECT '🔧 Índices en guests:' as info;
+SHOW INDEX FROM guests;
+
+SELECT '🔧 Índices en attendance:' as info;
+SHOW INDEX FROM attendance;
