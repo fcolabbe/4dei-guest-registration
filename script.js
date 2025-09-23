@@ -3,7 +3,10 @@ class MobileQRScanner {
     constructor() {
         this.scanning = false;
         this.stream = null;
-        this.apiBaseUrl = 'http://localhost:3001';
+        // Detectar automáticamente el entorno
+        this.apiBaseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:3009'  // Desarrollo
+            : '';  // Producción - usar rutas relativas
         this.registeredGuests = [];
         this.currentStats = { total: 0, attended: 0, pending: 0 };
         
