@@ -624,78 +624,47 @@ app.get('/api/guests', async (req, res) => {
         const search = req.query.search || '';
         const attendanceFilter = req.query.attendance || 'all';
         
-        console.log(`🔍 API /api/guests - Search: "${search}", Filter: ${attendanceFilter}, Page: ${page}`);
-        
-        // Construir consulta SQL con parámetros preparados
+        // Construir consulta SQL con filtros
         let whereConditions = [];
-        let queryParams = [];
         
-        // Filtro de búsqueda con parámetros preparados
+        // Filtro de búsqueda
         if (search && search.trim()) {
-            const searchPattern = `%${search.trim()}%`;
-            whereConditions.push('(g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)');
-            queryParams.push(searchPattern, searchPattern, searchPattern);
+            const searchTerm = search.replace(/'/g, "''"); // Escapar comillas simples
+            whereConditions.push(`(g.name LIKE '%${searchTerm}%' OR g.email LIKE '%${searchTerm}%' OR g.company LIKE '%${searchTerm}%')`);
         }
         
-        // NOTA: El código anterior se reemplazó con la versión simple de abajo
-        
-        // CORRECCIÓN ULTRA-RÁPIDA: Cambiar a consulta simple con LEFT JOIN
-        const simpleQuery = `
-            SELECT DISTINCT g.id, g.name, g.email, g.company, g.phone, g.category, 
-                   g.table_number, g.special_requirements, g.qr_code, 
-                   g.created_at, g.updated_at,
-                   CASE WHEN a.guest_id IS NOT NULL THEN 1 ELSE 0 END as has_attended,
-                   MAX(a.check_in_time) as last_check_in
-            FROM guests g
-            LEFT JOIN attendance a ON g.id = a.guest_id
-        `;
-        
-        // Reconstruir la consulta con LEFT JOIN simple
-        let finalQuery = simpleQuery;
-        let finalParams = [];
-        
-        // Agregar condiciones WHERE
-        let conditions = [];
-        if (search && search.trim()) {
-            const searchPattern = `%${search.trim()}%`;
-            conditions.push('(g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)');
-            finalParams.push(searchPattern, searchPattern, searchPattern);
-        }
-        
+        // Filtro de asistencia
         if (attendanceFilter === 'attended') {
-            conditions.push('a.guest_id IS NOT NULL');
+            whereConditions.push('a.guest_id IS NOT NULL');
         } else if (attendanceFilter === 'pending') {
-            conditions.push('a.guest_id IS NULL');
+            whereConditions.push('a.guest_id IS NULL');
         }
         
-        if (conditions.length > 0) {
-            finalQuery += ` WHERE ${conditions.join(' AND ')}`;
-        }
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
         
-        finalQuery += ` GROUP BY g.id ORDER BY g.name LIMIT ? OFFSET ?`;
-        finalParams.push(limit, offset);
-        
-        console.log(`🔄 SIMPLE Query: ${finalQuery}`);
-        console.log(`🔄 SIMPLE Params:`, finalParams);
-        
-        const [guests] = await db.execute(finalQuery, finalParams);
-        
-        // Conteo simple
-        let countQuery = `
-            SELECT COUNT(DISTINCT g.id) as total 
+        const query = `
+            SELECT g.*, 
+                   CASE WHEN a.guest_id IS NOT NULL THEN 1 ELSE 0 END as has_attended,
+                   a.check_in_time as last_check_in
             FROM guests g
             LEFT JOIN attendance a ON g.id = a.guest_id
+            ${whereClause}
+            ORDER BY g.name 
+            LIMIT ${limit} OFFSET ${offset}
         `;
         
-        if (conditions.length > 0) {
-            countQuery += ` WHERE ${conditions.join(' AND ')}`;
-        }
+        const [guests] = await db.query(query);
         
-        const countParams = finalParams.slice(0, -2); // Sin LIMIT/OFFSET
-        const [totalResult] = await db.execute(countQuery, countParams);
+        // Contar total para paginación con los mismos filtros
+        const countQuery = `
+            SELECT COUNT(*) as total 
+            FROM guests g
+            LEFT JOIN attendance a ON g.id = a.guest_id
+            ${whereClause}
+        `;
+        
+        const [totalResult] = await db.query(countQuery);
         const total = totalResult[0].total;
-        
-        console.log(`✅ SIMPLE Found ${guests.length} guests, total: ${total}`);
         
         res.json({
             success: true,
@@ -710,22 +679,10 @@ app.get('/api/guests', async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error listando invitados:', error);
-        console.error('❌ Error details:', error.message);
-        console.error('❌ Error stack:', error.stack);
-        console.error('❌ Query params:', queryParams);
-        console.error('❌ Search term:', search);
-        console.error('❌ Attendance filter:', attendanceFilter);
-        
         res.status(500).json({
             success: false,
             message: 'Error listando invitados',
-            error: error.message,
-            debug: {
-                search: search,
-                attendanceFilter: attendanceFilter,
-                page: page,
-                limit: limit
-            }
+            error: error.message
         });
     }
 });
