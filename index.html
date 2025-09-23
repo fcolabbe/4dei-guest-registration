@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>4DEI Foro - Registro de Asistencia</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+</head>
+<body>
+    <!-- Header con logo y menú -->
+    <header class="mobile-header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="logo">🏢</div>
+                <div class="logo-text">
+                    <h1>4DEI Foro</h1>
+                    <p>Registro de Asistencia</p>
+                </div>
+            </div>
+            <button class="menu-toggle" onclick="toggleMenu()">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+        
+        <!-- Menú de navegación -->
+        <nav class="mobile-nav" id="mobileNav">
+            <div class="nav-item active" onclick="showScanner()" data-section="scanner">
+                <div class="nav-icon">📷</div>
+                <div class="nav-label">Escanear QR</div>
+            </div>
+            <div class="nav-item" onclick="showManualCheck()" data-section="manual">
+                <div class="nav-icon">✏️</div>
+                <div class="nav-label">Check-in Manual</div>
+            </div>
+            <div class="nav-item" onclick="showStats()" data-section="stats">
+                <div class="nav-icon">📊</div>
+                <div class="nav-label">Estadísticas</div>
+            </div>
+            <div class="nav-item" onclick="openAdminPanel()">
+                <div class="nav-icon">⚙️</div>
+                <div class="nav-label">Admin Panel</div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Botón flotante de acceso rápido -->
+    <div class="fab-container">
+        <button class="fab" id="quickScanFab" onclick="quickScan()">
+            <div class="fab-icon">📷</div>
+            <div class="fab-text">Scan</div>
+        </button>
+    </div>
+
+    <!-- Secciones principales -->
+    <div class="app-container">
+        
+        <!-- Sección del Escáner QR -->
+        <section id="scanner-section" class="app-section active">
+            <div class="section-header">
+                <h2>📷 Escáner QR</h2>
+                <p>Apunta la cámara al código QR del invitado</p>
+            </div>
+
+            <!-- Área del visor de la cámara -->
+            <div class="camera-section">
+                <div class="camera-container">
+                    <video id="video" autoplay muted playsinline></video>
+                    <div class="scanner-overlay">
+                        <div class="scanner-frame">
+                            <div class="corner top-left"></div>
+                            <div class="corner top-right"></div>
+                            <div class="corner bottom-left"></div>
+                            <div class="corner bottom-right"></div>
+                        </div>
+                        <div class="scanner-text">Apunta al código QR</div>
+                        <div class="scanner-status" id="scanner-status">Cámara lista</div>
+                    </div>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                </div>
+
+                <!-- Control principal -->
+                <div class="main-control">
+                    <button id="startBtn" class="control-btn start-button">
+                        <span class="button-icon">📹</span>
+                        <span class="button-text">Iniciar Escáner</span>
+                    </button>
+                    <button id="stopBtn" class="control-btn stop-button" style="display: none;">
+                        <span class="button-icon">⏹️</span>
+                        <span class="button-text">Detener</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección de Check-in Manual -->
+        <section id="manual-section" class="app-section">
+            <div class="section-header">
+                <h2>✏️ Check-in Manual</h2>
+                <p>Busca y registra invitados sin código QR</p>
+            </div>
+            
+            <div class="manual-checkin-form">
+                <div class="search-container">
+                    <input type="text" id="guestSearch" placeholder="Buscar por nombre, email o empresa..." class="search-input">
+                    <button onclick="searchGuests()" class="search-btn">🔍</button>
+                </div>
+                
+                <div id="searchResults" class="search-results"></div>
+                
+                <div class="quick-actions">
+                    <button onclick="showNewGuestForm()" class="action-btn">
+                        <span>👤</span>
+                        Nuevo Invitado
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección de Estadísticas -->
+        <section id="stats-section" class="app-section">
+            <div class="section-header">
+                <h2>📊 Estadísticas del Evento</h2>
+                <p>Resumen de asistencia en tiempo real</p>
+            </div>
+            
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-value" id="totalGuests">-</div>
+                    <div class="stat-label">Total Invitados</div>
+                </div>
+                
+                <div class="stat-card attended">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-value" id="attendedGuests">-</div>
+                    <div class="stat-label">Asistieron</div>
+                </div>
+                
+                <div class="stat-card pending">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-value" id="pendingGuests">-</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+                
+                <div class="stat-card percentage">
+                    <div class="stat-icon">📈</div>
+                    <div class="stat-value" id="attendancePercentage">-</div>
+                    <div class="stat-label">% Asistencia</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tarjeta de invitado registrado -->
+        <div id="guest-card" class="guest-card" style="display: none;">
+            <div class="card-header success">
+                <div class="status-icon" id="status-icon">✅</div>
+                <div class="status-text" id="status-text">¡Invitado Registrado!</div>
+            </div>
+            <div class="card-content">
+                <div class="guest-name" id="guest-name">Nombre del Invitado</div>
+                <div class="guest-details" id="guest-details">Detalles del invitado</div>
+                <div class="registration-time" id="registration-time">Registrado: --</div>
+            </div>
+            <div class="card-actions">
+                <button onclick="qrScanner.continueScanning()" class="action-btn primary">
+                    <span>🔄</span>
+                    Continuar Escaneando
+                </button>
+            </div>
+        </div>
+
+        <!-- Alerta de duplicado -->
+        <div id="duplicate-alert" class="duplicate-alert" style="display: none;">
+            <div class="alert-header">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-title">¡Ya Registrado!</div>
+            </div>
+            <div class="alert-content">
+                <div class="duplicate-info">
+                    <div class="duplicate-name" id="duplicate-name">Nombre del Invitado</div>
+                    <div class="duplicate-time" id="duplicate-time">Registrado hace: --</div>
+                </div>
+            </div>
+            <div class="alert-actions">
+                <button onclick="qrScanner.dismissDuplicateAlert()" class="action-btn secondary">
+                    <span>👍</span>
+                    Continuar
+                </button>
+            </div>
+        </div>
+
+        <!-- Estado simple -->
+        <div id="simple-status" class="simple-status" style="display: none;">
+            <div class="simple-icon" id="simple-icon">📷</div>
+            <div class="simple-text" id="simple-text">Listo para escanear</div>
+        </div>
+
+        <!-- Modal para nuevo invitado -->
+        <div id="newGuestModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>👤 Nuevo Invitado</h3>
+                    <button onclick="closeNewGuestModal()" class="close-btn">&times;</button>
+                </div>
+                <form id="newGuestForm" class="modal-form">
+                    <div class="form-group">
+                        <label>Nombre Completo *</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" name="phone">
+                    </div>
+                    <div class="form-group">
+                        <label>Empresa</label>
+                        <input type="text" name="company">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" name="auto_checkin" checked>
+                            Registrar automáticamente
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" onclick="closeNewGuestModal()" class="btn-secondary">Cancelar</button>
+                        <button type="submit" class="btn-primary">Crear Invitado</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Elementos de debug (ocultos) -->
+        <div id="debug-info" style="display: none;">
+            <span id="debug-qr-text">-</span>
+            <span id="debug-webhook-status">-</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

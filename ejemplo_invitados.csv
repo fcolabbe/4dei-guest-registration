@@ -1,0 +1,16 @@
+qr_code,name,email,phone,company,category,table_number,special_requirements
+INV001,Juan Pérez Martínez,juan.perez@empresa.com,+1234567890,Empresa Tecnológica ABC,VIP,1,Vegetariano
+INV002,María García López,maria.garcia@corporacion.com,+1234567891,Corporación XYZ,General,5,Sin gluten
+INV003,Carlos Rodríguez Silva,carlos.rodriguez@startup.com,+1234567892,Startup Innovadora,General,5,Ninguno
+INV004,Ana Fernández Torres,ana.fernandez@prensa.com,+1234567893,Diario El Informador,Prensa,10,Acceso para silla de ruedas
+INV005,Luis Martín González,luis.martin@gobierno.gov,+1234567894,Ministerio de Tecnología,Gobierno,2,Ninguno
+INV006,Carmen Sánchez Ruiz,carmen.sanchez@ong.org,+1234567895,ONG Desarrollo Social,ONG,8,Vegetariano estricto
+INV007,Roberto Díaz Morales,roberto.diaz@universidad.edu,+1234567896,Universidad Nacional,Académico,12,Ninguno
+INV008,Elena Jiménez Castro,elena.jimenez@consultora.com,+1234567897,Consultora Estratégica,General,6,Sin lácteos
+INV009,Francisco Herrera Vega,francisco.herrera@banco.com,+1234567898,Banco Internacional,VIP,3,Ninguno
+INV010,Isabel Moreno Ortega,isabel.moreno@fundacion.org,+1234567899,Fundación Futuro,ONG,9,Diabético
+INV011,Miguel Torres Ramírez,miguel.torres@tech.com,+1234567800,Tech Solutions Inc,General,7,Ninguno
+INV012,Patricia Vargas Luna,patricia.vargas@media.com,+1234567801,Canal de Noticias 24/7,Prensa,11,Vegetariano
+INV013,Andrés Castillo Prado,andres.castillo@innovacion.com,+1234567802,Centro de Innovación,Académico,13,Ninguno
+INV014,Lucía Ramos Delgado,lucia.ramos@internacional.org,+1234567803,Organización Internacional,Gobierno,4,Sin gluten
+INV015,Daniel Guerrero Méndez,daniel.guerrero@empresa2.com,+1234567804,Empresa Global S.A.,General,14,Ninguno

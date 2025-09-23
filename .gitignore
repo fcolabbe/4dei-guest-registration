@@ -1,0 +1,50 @@
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de entorno
+.env
+config.env
+
+# Archivos temporales de sistema
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Archivos de log
+*.log
+
+# Archivos de Excel temporales
+~$*.xlsx
+~$*.xls
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos de prueba temporal
+test_*.html
+
+# Carpeta de uploads temporales
+uploads/
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de base de datos temporales
+*.sqlite
+*.db
+
+# Archivos de certificados
+*.pem
+*.key
+*.crt
