@@ -624,13 +624,17 @@ app.get('/api/guests', async (req, res) => {
         const search = req.query.search || '';
         const attendanceFilter = req.query.attendance || 'all';
         
-        // Construir consulta SQL con filtros
-        let whereConditions = [];
+        console.log(`🔍 API /api/guests - Search: "${search}", Filter: ${attendanceFilter}, Page: ${page}`);
         
-        // Filtro de búsqueda
+        // Construir consulta SQL con parámetros preparados
+        let whereConditions = [];
+        let queryParams = [];
+        
+        // Filtro de búsqueda con parámetros preparados
         if (search && search.trim()) {
-            const searchTerm = search.replace(/'/g, "''"); // Escapar comillas simples
-            whereConditions.push(`(g.name LIKE '%${searchTerm}%' OR g.email LIKE '%${searchTerm}%' OR g.company LIKE '%${searchTerm}%')`);
+            const searchPattern = `%${search.trim()}%`;
+            whereConditions.push('(g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)');
+            queryParams.push(searchPattern, searchPattern, searchPattern);
         }
         
         // Filtro de asistencia
@@ -645,25 +649,37 @@ app.get('/api/guests', async (req, res) => {
         const query = `
             SELECT g.*, 
                    CASE WHEN a.guest_id IS NOT NULL THEN 1 ELSE 0 END as has_attended,
-                   a.check_in_time as last_check_in
+                   MAX(a.check_in_time) as last_check_in
             FROM guests g
             LEFT JOIN attendance a ON g.id = a.guest_id
             ${whereClause}
+            GROUP BY g.id
             ORDER BY g.name 
-            LIMIT ${limit} OFFSET ${offset}
+            LIMIT ? OFFSET ?
         `;
         
-        const [guests] = await db.query(query);
+        // Agregar limit y offset a los parámetros
+        queryParams.push(limit, offset);
+        
+        console.log(`📋 Query: ${query}`);
+        console.log(`📋 Params:`, queryParams);
+        
+        const [guests] = await db.execute(query, queryParams);
         
         // Contar total para paginación con los mismos filtros
         const countQuery = `
-            SELECT COUNT(*) as total 
+            SELECT COUNT(DISTINCT g.id) as total 
             FROM guests g
             LEFT JOIN attendance a ON g.id = a.guest_id
             ${whereClause}
         `;
         
-        const [totalResult] = await db.query(countQuery);
+        // Usar los mismos parámetros pero sin limit y offset
+        const countParams = queryParams.slice(0, -2);
+        console.log(`📊 Count Query: ${countQuery}`);
+        console.log(`📊 Count Params:`, countParams);
+        
+        const [totalResult] = await db.execute(countQuery, countParams);
         const total = totalResult[0].total;
         
         res.json({

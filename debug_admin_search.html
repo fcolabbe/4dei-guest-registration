@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug Admin Search</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .debug-container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            min-height: 100px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        
+        .test-email {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #cce7ff; color: #004085; }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h2>🔍 Debug - Búsqueda Admin</h2>
+        <p>Herramienta para diagnosticar problemas de búsqueda en el panel admin</p>
+        
+        <input type="text" 
+               class="form-control" 
+               id="searchInput" 
+               placeholder="Buscar invitado..."
+               value="idarmis101@gmail.com">
+        
+        <div>
+            <button class="btn" onclick="testSearch()">🔍 Buscar</button>
+            <button class="btn" onclick="testMultiple()">🧪 Probar Múltiples</button>
+            <button class="btn" onclick="clearResults()">🧹 Limpiar</button>
+        </div>
+        
+        <h4>📧 Emails de Prueba (click para probar):</h4>
+        <div class="test-email" onclick="testEmail('idarmis101@gmail.com')">
+            📧 idarmis101@gmail.com (reportado como no encontrado)
+        </div>
+        <div class="test-email" onclick="testEmail('gmail.com')">
+            🔍 gmail.com (búsqueda parcial)
+        </div>
+        <div class="test-email" onclick="testEmail('idarmis')">
+            🔍 idarmis (búsqueda por nombre)
+        </div>
+        
+        <div class="results" id="results">
+            Haz clic en "Buscar" para probar la funcionalidad...
+        </div>
+    </div>
+
+    <div class="debug-container">
+        <h3>📊 Información del Sistema</h3>
+        <div id="systemInfo">
+            <p><strong>URL Base:</strong> <span id="baseUrl"></span></p>
+            <p><strong>User Agent:</strong> <span id="userAgent"></span></p>
+            <p><strong>Timestamp:</strong> <span id="timestamp"></span></p>
+        </div>
+    </div>
+
+    <script>
+        let searchTimeout;
+        
+        // Inicializar información del sistema
+        document.getElementById('baseUrl').textContent = window.location.origin;
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        
+        function testEmail(email) {
+            document.getElementById('searchInput').value = email;
+            testSearch();
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = 'Resultados limpiados...';
+        }
+        
+        async function testSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const resultsDiv = document.getElementById('results');
+            
+            if (!query) {
+                resultsDiv.innerHTML = '❌ Por favor ingresa un término de búsqueda';
+                return;
+            }
+            
+            resultsDiv.innerHTML = `🔍 Buscando "${query}"...\n\n`;
+            
+            try {
+                const baseUrl = window.location.origin;
+                const url = `${baseUrl}/api/guests?search=${encodeURIComponent(query)}&limit=10`;
+                
+                resultsDiv.innerHTML += `📡 URL: ${url}\n\n`;
+                
+                const startTime = Date.now();
+                const response = await fetch(url);
+                const endTime = Date.now();
+                
+                resultsDiv.innerHTML += `⏱️ Tiempo de respuesta: ${endTime - startTime}ms\n`;
+                resultsDiv.innerHTML += `📊 Status: ${response.status} ${response.statusText}\n`;
+                resultsDiv.innerHTML += `📋 Headers: ${JSON.stringify([...response.headers.entries()], null, 2)}\n\n`;
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    resultsDiv.innerHTML += `❌ ERROR:\n${errorText}\n`;
+                    resultsDiv.className = 'results error';
+                    return;
+                }
+                
+                const result = await response.json();
+                
+                resultsDiv.innerHTML += `✅ RESPUESTA JSON:\n${JSON.stringify(result, null, 2)}\n\n`;
+                
+                if (result.success && result.guests && result.guests.length > 0) {
+                    resultsDiv.innerHTML += `🎉 ENCONTRADOS ${result.guests.length} INVITADOS:\n\n`;
+                    result.guests.forEach((guest, index) => {
+                        resultsDiv.innerHTML += `${index + 1}. 👤 ${guest.name}\n`;
+                        resultsDiv.innerHTML += `   📧 ${guest.email || 'Sin email'}\n`;
+                        resultsDiv.innerHTML += `   🏢 ${guest.company || 'Sin empresa'}\n`;
+                        resultsDiv.innerHTML += `   🎫 QR: ${guest.qr_code}\n`;
+                        resultsDiv.innerHTML += `   📊 Estado: ${guest.has_attended ? '✅ Asistió' : '⏳ Pendiente'}\n`;
+                        if (guest.last_check_in) {
+                            resultsDiv.innerHTML += `   📅 Check-in: ${new Date(guest.last_check_in).toLocaleString()}\n`;
+                        }
+                        resultsDiv.innerHTML += `\n`;
+                    });
+                    resultsDiv.className = 'results success';
+                } else if (result.success) {
+                    resultsDiv.innerHTML += `🔍 SIN RESULTADOS para "${query}"\n`;
+                    resultsDiv.className = 'results info';
+                } else {
+                    resultsDiv.innerHTML += `❌ ERROR EN RESPUESTA: ${result.message || 'Error desconocido'}\n`;
+                    resultsDiv.className = 'results error';
+                }
+                
+            } catch (error) {
+                resultsDiv.innerHTML += `💥 EXCEPCIÓN:\n${error.message}\n${error.stack}\n`;
+                resultsDiv.className = 'results error';
+            }
+        }
+        
+        async function testMultiple() {
+            const testEmails = [
+                'idarmis101@gmail.com',
+                'idarmis',
+                'gmail.com',
+                'chacon',
+                'delicias'
+            ];
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '🧪 PRUEBA MÚLTIPLE INICIADA...\n\n';
+            
+            for (let i = 0; i < testEmails.length; i++) {
+                const email = testEmails[i];
+                resultsDiv.innerHTML += `--- PRUEBA ${i + 1}: "${email}" ---\n`;
+                
+                try {
+                    const url = `${window.location.origin}/api/guests?search=${encodeURIComponent(email)}&limit=5`;
+                    const response = await fetch(url);
+                    const result = await response.json();
+                    
+                    if (result.success && result.guests) {
+                        resultsDiv.innerHTML += `✅ ${result.guests.length} resultados\n`;
+                        if (result.guests.length > 0) {
+                            resultsDiv.innerHTML += `   Primero: ${result.guests[0].name} - ${result.guests[0].email}\n`;
+                        }
+                    } else {
+                        resultsDiv.innerHTML += `❌ Sin resultados o error\n`;
+                    }
+                } catch (error) {
+                    resultsDiv.innerHTML += `💥 Error: ${error.message}\n`;
+                }
+                
+                resultsDiv.innerHTML += `\n`;
+                
+                // Pequeña pausa entre pruebas
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            resultsDiv.innerHTML += `🎉 PRUEBA MÚLTIPLE COMPLETADA\n`;
+        }
+    </script>
+</body>
+</html>
