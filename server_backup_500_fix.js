@@ -637,35 +637,32 @@ app.get('/api/guests', async (req, res) => {
             queryParams.push(searchPattern, searchPattern, searchPattern);
         }
         
-        // Los filtros de asistencia se manejan en la construcción de la query principal
-        
-        // VERSIÓN SIMPLIFICADA SIN SUBCONSULTAS COMPLEJAS
-        let mainQuery = `
-            SELECT g.id, g.name, g.email, g.company, g.phone, g.category, 
-                   g.table_number, g.special_requirements, g.qr_code, 
-                   g.created_at, g.updated_at
-            FROM guests g
-        `;
-        
-        // Agregar filtros de asistencia si es necesario
+        // Filtro de asistencia - ajustar para nueva estructura
         if (attendanceFilter === 'attended') {
-            mainQuery += ` WHERE EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (whereConditions.length > 0) {
-                mainQuery += ` AND ${whereConditions.join(' AND ')}`;
-            }
+            whereConditions.push('att.has_attended IS NOT NULL');
         } else if (attendanceFilter === 'pending') {
-            mainQuery += ` WHERE NOT EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (whereConditions.length > 0) {
-                mainQuery += ` AND ${whereConditions.join(' AND ')}`;
-            }
-        } else {
-            // attendanceFilter === 'all'
-            if (whereConditions.length > 0) {
-                mainQuery += ` WHERE ${whereConditions.join(' AND ')}`;
-            }
+            whereConditions.push('att.has_attended IS NULL');
         }
         
-        const query = mainQuery + ` ORDER BY g.name LIMIT ? OFFSET ?`;
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        // Usar subconsulta para evitar problemas con GROUP BY
+        const query = `
+            SELECT g.*, 
+                   COALESCE(att.has_attended, 0) as has_attended,
+                   att.last_check_in
+            FROM guests g
+            LEFT JOIN (
+                SELECT guest_id, 
+                       1 as has_attended,
+                       MAX(check_in_time) as last_check_in
+                FROM attendance 
+                GROUP BY guest_id
+            ) att ON g.id = att.guest_id
+            ${whereClause}
+            ORDER BY g.name 
+            LIMIT ? OFFSET ?
+        `;
         
         // Agregar limit y offset a los parámetros
         queryParams.push(limit, offset);
@@ -675,62 +672,31 @@ app.get('/api/guests', async (req, res) => {
         
         const [guests] = await db.execute(query, queryParams);
         
-        // Obtener información de asistencia para cada invitado
-        const guestsWithAttendance = [];
-        for (const guest of guests) {
-            const [attendance] = await db.execute(
-                `SELECT MAX(check_in_time) as last_check_in 
-                 FROM attendance 
-                 WHERE guest_id = ?`,
-                [guest.id]
-            );
-            
-            const lastCheckIn = attendance[0]?.last_check_in || null;
-            
-            guestsWithAttendance.push({
-                ...guest,
-                has_attended: lastCheckIn ? 1 : 0,
-                last_check_in: lastCheckIn
-            });
-        }
+        // Contar total para paginación con los mismos filtros
+        const countQuery = `
+            SELECT COUNT(*) as total 
+            FROM guests g
+            LEFT JOIN (
+                SELECT guest_id, 
+                       1 as has_attended,
+                       MAX(check_in_time) as last_check_in
+                FROM attendance 
+                GROUP BY guest_id
+            ) att ON g.id = att.guest_id
+            ${whereClause}
+        `;
         
-        // Consulta de conteo simplificada
-        let countQuery = `SELECT COUNT(*) as total FROM guests g`;
-        let countParams = [];
-        
-        // Aplicar los mismos filtros para el conteo
-        if (search && search.trim()) {
-            const searchPattern = `%${search.trim()}%`;
-            countParams.push(searchPattern, searchPattern, searchPattern);
-        }
-        
-        if (attendanceFilter === 'attended') {
-            countQuery += ` WHERE EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (search && search.trim()) {
-                countQuery += ` AND (g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)`;
-            }
-        } else if (attendanceFilter === 'pending') {
-            countQuery += ` WHERE NOT EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (search && search.trim()) {
-                countQuery += ` AND (g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)`;
-            }
-        } else {
-            if (search && search.trim()) {
-                countQuery += ` WHERE (g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)`;
-            }
-        }
-        
+        // Usar los mismos parámetros pero sin limit y offset
+        const countParams = queryParams.slice(0, -2);
         console.log(`📊 Count Query: ${countQuery}`);
         console.log(`📊 Count Params:`, countParams);
         
         const [totalResult] = await db.execute(countQuery, countParams);
         const total = totalResult[0].total;
         
-        console.log(`✅ Found ${guestsWithAttendance.length} guests, total: ${total}`);
-        
         res.json({
             success: true,
-            guests: guestsWithAttendance,
+            guests: guests,
             pagination: {
                 page: page,
                 limit: limit,
