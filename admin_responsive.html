@@ -291,29 +291,6 @@
             margin-bottom: 5px;
         }
 
-        /* Search Results Specific Styles */
-        #manualSearchResults {
-            max-height: 400px;
-            overflow-y: auto;
-            margin-top: 15px;
-        }
-
-        #manualSearchResults .card-item {
-            margin-bottom: 15px;
-            border-left: 4px solid #667eea;
-            transition: all 0.3s ease;
-        }
-
-        #manualSearchResults .card-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
-        }
-
-        #manualSearchResults .loading {
-            text-align: center;
-            padding: 20px;
-        }
-
         /* Search and Filters */
         .filters {
             display: grid;
@@ -733,35 +710,22 @@
 
         <!-- Check-in Tab -->
         <div id="checkin-tab" class="tab-content">
-            <div class="alert alert-info">
-                <strong>✅ Check-in Manual</strong><br>
-                Busca invitados por nombre o email para registrar su asistencia
-            </div>
-
             <div class="form-group">
                 <label>🔍 Buscar Invitado</label>
                 <div class="search-container">
-                    <input type="text" class="form-control" id="manualSearchInput" placeholder="Escribe nombre, email o empresa..." onkeyup="manualSearch()" autocomplete="off">
-                </div>
-                <small style="color: #666; font-size: 0.8rem;">Mínimo 2 caracteres para buscar</small>
-            </div>
-
-            <div id="manualSearchResults">
-                <div style="text-align: center; padding: 40px 20px; color: #666;">
-                    <div style="font-size: 3rem; margin-bottom: 15px;">🔍</div>
-                    <p><strong>Busca un invitado</strong></p>
-                    <p style="font-size: 0.9rem;">Escribe el nombre, email o empresa en el campo de arriba</p>
+                    <input type="text" class="form-control" id="manualSearchInput" placeholder="Nombre o email..." onkeyup="manualSearch()">
                 </div>
             </div>
 
-            <div style="margin: 30px 0; text-align: center;">
-                <div style="border-top: 1px solid #e1e5e9; padding-top: 20px;">
-                    <p style="color: #666; margin-bottom: 15px;"><strong>¿No encuentras al invitado?</strong></p>
-                    <button class="btn btn-success" onclick="showNewGuestModal()">
-                        👤 Registrar Nuevo Invitado
-                    </button>
-                </div>
+            <div id="manualSearchResults"></div>
+
+            <div style="margin: 20px 0; text-align: center; color: #666;">
+                <p>- O -</p>
             </div>
+
+            <button class="btn btn-success" onclick="showNewGuestModal()">
+                👤 Registrar Nuevo Invitado
+            </button>
         </div>
 
         <!-- Settings Tab -->
@@ -1087,87 +1051,6 @@
             showModal(modalId) {
                 document.getElementById(modalId).style.display = 'flex';
             }
-
-            async manualSearch(query) {
-                const searchInput = document.getElementById('manualSearchInput');
-                const resultsContainer = document.getElementById('manualSearchResults');
-                
-                if (!query) {
-                    query = searchInput.value.trim();
-                }
-                
-                if (query.length < 2) {
-                    // Mostrar estado inicial
-                    resultsContainer.innerHTML = `
-                        <div style="text-align: center; padding: 40px 20px; color: #666;">
-                            <div style="font-size: 3rem; margin-bottom: 15px;">🔍</div>
-                            <p><strong>Busca un invitado</strong></p>
-                            <p style="font-size: 0.9rem;">Escribe el nombre, email o empresa en el campo de arriba</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                try {
-                    resultsContainer.innerHTML = `
-                        <div class="loading">
-                            <div class="spinner"></div>
-                            <p>Buscando invitados...</p>
-                        </div>
-                    `;
-
-                    const response = await fetch(`${this.apiBaseUrl}/api/guests?search=${encodeURIComponent(query)}&limit=10`);
-                    const result = await response.json();
-
-                    if (result.success && result.guests.length > 0) {
-                        resultsContainer.innerHTML = result.guests.map(guest => `
-                            <div class="card-item">
-                                <h4>${guest.name}</h4>
-                                <div class="info"><strong>Email:</strong> ${guest.email || 'No especificado'}</div>
-                                <div class="info"><strong>Empresa:</strong> ${guest.company || 'No especificada'}</div>
-                                <div class="info"><strong>QR:</strong> ${guest.qr_code}</div>
-                                <div class="info">
-                                    <strong>Estado:</strong> 
-                                    <span style="color: ${guest.has_attended ? '#28a745' : '#6c757d'}">
-                                        ${guest.has_attended ? '✅ Ya registrado' : '⏳ Pendiente'}
-                                    </span>
-                                </div>
-                                ${guest.has_attended && guest.last_check_in ? 
-                                    `<div class="info"><strong>Check-in:</strong> ${new Date(guest.last_check_in).toLocaleString()}</div>` : ''
-                                }
-                                <div class="actions">
-                                    ${!guest.has_attended ? 
-                                        `<button class="btn btn-success" onclick="adminPanel.manualCheckin(${guest.id})">
-                                            ✅ Registrar Check-in
-                                        </button>` :
-                                        `<button class="btn btn-warning" onclick="adminPanel.markAbsent(${guest.id})">
-                                            ❌ Marcar Ausente
-                                        </button>`
-                                    }
-                                    <button class="btn btn-info" onclick="adminPanel.downloadTicket('${guest.qr_code}', '${guest.name}')">
-                                        🎫 Descargar Ticket
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('');
-                    } else {
-                        resultsContainer.innerHTML = `
-                            <div class="alert alert-info">
-                                <strong>🔍 Sin resultados</strong><br>
-                                No se encontraron invitados con "${query}"
-                            </div>
-                        `;
-                    }
-                } catch (error) {
-                    console.error('Error en búsqueda manual:', error);
-                    resultsContainer.innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>❌ Error</strong><br>
-                            No se pudo realizar la búsqueda
-                        </div>
-                    `;
-                }
-            }
         }
 
         // Global functions
@@ -1212,13 +1095,6 @@
 
         function quickAction() {
             showTab('checkin');
-        }
-
-        function manualSearch() {
-            clearTimeout(window.manualSearchTimeout);
-            window.manualSearchTimeout = setTimeout(() => {
-                adminPanel.manualSearch();
-            }, 500);
         }
 
         function handleFileSelect(event) {
