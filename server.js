@@ -400,9 +400,13 @@ app.post('/api/check-in', async (req, res) => {
         }
         
         // Registrar nueva asistencia
+        const safeDeviceInfo = device_info ? JSON.stringify(device_info) : '{"type": "mobile", "source": "qr_scanner"}';
+        const safeLocation = location || 'Evento principal';
+        const safeNotes = notes || 'Registrado via QR scanner';
+        
         await db.execute(
             'INSERT INTO attendance (guest_id, qr_code, device_info, location, notes) VALUES (?, ?, ?, ?, ?)',
-            [guest.id, qr_code, JSON.stringify(device_info), location, notes]
+            [guest.id, qr_code, safeDeviceInfo, safeLocation, safeNotes]
         );
         
         res.json({

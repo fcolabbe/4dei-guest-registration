@@ -174,8 +174,15 @@ class MobileQRScanner {
                     this.registerLocalGuest(data.guest);
                 }
                 
-                // Actualizar estadísticas
-                this.loadStats();
+                // Actualizar estadísticas inmediatamente
+                console.log('🔄 Actualizando estadísticas después de check-in exitoso');
+                await this.loadStats();
+                
+                // Segunda actualización por si acaso
+                setTimeout(() => {
+                    console.log('🔄 Segunda actualización de estadísticas');
+                    this.loadStats();
+                }, 2000);
                 
                 // Enviar a webhook como respaldo
                 this.sendToWebhook(qrText);
@@ -444,15 +451,28 @@ class MobileQRScanner {
     
     async loadStats() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/api/stats`);
+            // Forzar actualización sin caché
+            const timestamp = new Date().getTime();
+            const response = await fetch(`${this.apiBaseUrl}/api/stats?_t=${timestamp}`, {
+                method: 'GET',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
+            
             const data = await response.json();
+            console.log('📊 Estadísticas recibidas del servidor:', data.stats);
             
             if (data.success) {
                 this.currentStats = data.stats;
                 this.updateStatsDisplay();
+            } else {
+                console.error('❌ Error en datos del servidor:', data);
             }
         } catch (error) {
-            console.error('Error cargando estadísticas:', error);
+            console.error('❌ Error cargando estadísticas:', error);
         }
     }
     
