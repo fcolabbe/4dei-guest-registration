@@ -637,100 +637,69 @@ app.get('/api/guests', async (req, res) => {
             queryParams.push(searchPattern, searchPattern, searchPattern);
         }
         
-        // Los filtros de asistencia se manejan en la construcción de la query principal
+        // NOTA: El código anterior se reemplazó con la versión simple de abajo
         
-        // VERSIÓN SIMPLIFICADA SIN SUBCONSULTAS COMPLEJAS
-        let mainQuery = `
-            SELECT g.id, g.name, g.email, g.company, g.phone, g.category, 
+        // CORRECCIÓN ULTRA-RÁPIDA: Cambiar a consulta simple con LEFT JOIN
+        const simpleQuery = `
+            SELECT DISTINCT g.id, g.name, g.email, g.company, g.phone, g.category, 
                    g.table_number, g.special_requirements, g.qr_code, 
-                   g.created_at, g.updated_at
+                   g.created_at, g.updated_at,
+                   CASE WHEN a.guest_id IS NOT NULL THEN 1 ELSE 0 END as has_attended,
+                   MAX(a.check_in_time) as last_check_in
             FROM guests g
+            LEFT JOIN attendance a ON g.id = a.guest_id
         `;
         
-        // Agregar filtros de asistencia si es necesario
-        if (attendanceFilter === 'attended') {
-            mainQuery += ` WHERE EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (whereConditions.length > 0) {
-                mainQuery += ` AND ${whereConditions.join(' AND ')}`;
-            }
-        } else if (attendanceFilter === 'pending') {
-            mainQuery += ` WHERE NOT EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (whereConditions.length > 0) {
-                mainQuery += ` AND ${whereConditions.join(' AND ')}`;
-            }
-        } else {
-            // attendanceFilter === 'all'
-            if (whereConditions.length > 0) {
-                mainQuery += ` WHERE ${whereConditions.join(' AND ')}`;
-            }
-        }
+        // Reconstruir la consulta con LEFT JOIN simple
+        let finalQuery = simpleQuery;
+        let finalParams = [];
         
-        const query = mainQuery + ` ORDER BY g.name LIMIT ? OFFSET ?`;
-        
-        // Agregar limit y offset a los parámetros
-        queryParams.push(limit, offset);
-        
-        console.log(`📋 Query: ${query}`);
-        console.log(`📋 Params:`, queryParams);
-        
-        const [guests] = await db.execute(query, queryParams);
-        
-        // Obtener información de asistencia para cada invitado
-        const guestsWithAttendance = [];
-        for (const guest of guests) {
-            const [attendance] = await db.execute(
-                `SELECT MAX(check_in_time) as last_check_in 
-                 FROM attendance 
-                 WHERE guest_id = ?`,
-                [guest.id]
-            );
-            
-            const lastCheckIn = attendance[0]?.last_check_in || null;
-            
-            guestsWithAttendance.push({
-                ...guest,
-                has_attended: lastCheckIn ? 1 : 0,
-                last_check_in: lastCheckIn
-            });
-        }
-        
-        // Consulta de conteo simplificada
-        let countQuery = `SELECT COUNT(*) as total FROM guests g`;
-        let countParams = [];
-        
-        // Aplicar los mismos filtros para el conteo
+        // Agregar condiciones WHERE
+        let conditions = [];
         if (search && search.trim()) {
             const searchPattern = `%${search.trim()}%`;
-            countParams.push(searchPattern, searchPattern, searchPattern);
+            conditions.push('(g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)');
+            finalParams.push(searchPattern, searchPattern, searchPattern);
         }
         
         if (attendanceFilter === 'attended') {
-            countQuery += ` WHERE EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (search && search.trim()) {
-                countQuery += ` AND (g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)`;
-            }
+            conditions.push('a.guest_id IS NOT NULL');
         } else if (attendanceFilter === 'pending') {
-            countQuery += ` WHERE NOT EXISTS (SELECT 1 FROM attendance a WHERE a.guest_id = g.id)`;
-            if (search && search.trim()) {
-                countQuery += ` AND (g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)`;
-            }
-        } else {
-            if (search && search.trim()) {
-                countQuery += ` WHERE (g.name LIKE ? OR g.email LIKE ? OR g.company LIKE ?)`;
-            }
+            conditions.push('a.guest_id IS NULL');
         }
         
-        console.log(`📊 Count Query: ${countQuery}`);
-        console.log(`📊 Count Params:`, countParams);
+        if (conditions.length > 0) {
+            finalQuery += ` WHERE ${conditions.join(' AND ')}`;
+        }
         
+        finalQuery += ` GROUP BY g.id ORDER BY g.name LIMIT ? OFFSET ?`;
+        finalParams.push(limit, offset);
+        
+        console.log(`🔄 SIMPLE Query: ${finalQuery}`);
+        console.log(`🔄 SIMPLE Params:`, finalParams);
+        
+        const [guests] = await db.execute(finalQuery, finalParams);
+        
+        // Conteo simple
+        let countQuery = `
+            SELECT COUNT(DISTINCT g.id) as total 
+            FROM guests g
+            LEFT JOIN attendance a ON g.id = a.guest_id
+        `;
+        
+        if (conditions.length > 0) {
+            countQuery += ` WHERE ${conditions.join(' AND ')}`;
+        }
+        
+        const countParams = finalParams.slice(0, -2); // Sin LIMIT/OFFSET
         const [totalResult] = await db.execute(countQuery, countParams);
         const total = totalResult[0].total;
         
-        console.log(`✅ Found ${guestsWithAttendance.length} guests, total: ${total}`);
+        console.log(`✅ SIMPLE Found ${guests.length} guests, total: ${total}`);
         
         res.json({
             success: true,
-            guests: guestsWithAttendance,
+            guests: guests,
             pagination: {
                 page: page,
                 limit: limit,
