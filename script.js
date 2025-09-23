@@ -464,22 +464,37 @@ class MobileQRScanner {
             attendancePercentage: document.getElementById('attendancePercentage')
         };
         
+        // Debug: mostrar datos recibidos
+        console.log('📊 Actualizando estadísticas:', this.currentStats);
+        
         const totalGuests = this.currentStats.total_guests || 0;
         const attendedGuests = this.currentStats.attended_guests || 0;
         const pendingGuests = totalGuests - attendedGuests;
         
         if (elements.totalGuests) {
             elements.totalGuests.textContent = totalGuests;
+            console.log('📊 Total invitados actualizado:', totalGuests);
         }
         if (elements.attendedGuests) {
             elements.attendedGuests.textContent = attendedGuests;
+            console.log('📊 Asistieron actualizado:', attendedGuests);
         }
         if (elements.pendingGuests) {
             elements.pendingGuests.textContent = pendingGuests;
+            console.log('📊 Pendientes actualizado:', pendingGuests);
         }
         if (elements.attendancePercentage) {
             const percentage = parseFloat(this.currentStats.attendance_rate) || 0;
             elements.attendancePercentage.textContent = percentage.toFixed(1) + '%';
+            console.log('📊 Porcentaje actualizado:', percentage + '%');
+        }
+        
+        // Verificar si los elementos existen en el DOM
+        if (!elements.totalGuests) {
+            console.warn('⚠️ Elemento totalGuests no encontrado en el DOM');
+        }
+        if (!elements.attendedGuests) {
+            console.warn('⚠️ Elemento attendedGuests no encontrado en el DOM');
         }
     }
     
