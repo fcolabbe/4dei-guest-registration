@@ -36,6 +36,7 @@ class MobileQRScanner {
         
         this.setupEventListeners();
         this.loadRegisteredGuests();
+        this.initializeAudio();
         
         console.log('🚀 Mobile QR Scanner inicializado');
     }
@@ -172,9 +173,18 @@ class MobileQRScanner {
                     };
                     console.log('🔄 Duplicado detectado:', duplicateGuest);
                     this.showDuplicateAlert(duplicateGuest);
+                    
+                    // 🎵 Sonido de notificación para duplicado
+                    this.playNotificationSound();
+                    this.vibrate([200]); // Vibración corta para notificación
                 } else {
+                    // ✅ Check-in exitoso
                     this.showGuestCard(data.guest);
                     this.registerLocalGuest(data.guest);
+                    
+                    // 🔊 Reproducir sonido de éxito y vibrar
+                    this.playSuccessSound();
+                    this.vibrate([100, 50, 100]); // Patrón de vibración de éxito
                 }
                 
                 // Actualizar estadísticas inmediatamente
@@ -192,11 +202,21 @@ class MobileQRScanner {
                 
             } else {
                 console.warn('⚠️ Check-in falló:', data.message);
+                
+                // 🚨 Reproducir sonido de error
+                this.playErrorSound();
+                this.vibrate([300, 100, 300]); // Patrón de vibración de error
+                
                 await this.handleCheckInError(qrText, data.message);
             }
             
         } catch (error) {
             console.error('❌ Error en check-in:', error);
+            
+            // 🚨 Reproducir sonido de error para excepciones
+            this.playErrorSound();
+            this.vibrate([300, 100, 300, 100, 300]); // Patrón de vibración de error crítico
+            
             await this.handleCheckInError(qrText, error.message);
         }
     }
@@ -218,6 +238,10 @@ class MobileQRScanner {
                 
                 this.showGuestCard(guestInfo);
                 this.registerLocalGuest(guestInfo);
+                
+                // 🔊 Sonido de éxito para webhook
+                this.playSuccessSound();
+                this.vibrate([100, 50, 100]);
             } else {
                 this.showOfflineMode(qrText, originalError);
             }
@@ -240,6 +264,10 @@ class MobileQRScanner {
         
         this.showGuestCard(guestInfo);
         this.registerLocalGuest(guestInfo);
+        
+        // 🔊 Sonido de éxito para modo offline
+        this.playSuccessSound();
+        this.vibrate([100, 50, 100]);
     }
     
     async sendToWebhook(qrText) {
@@ -267,6 +295,162 @@ class MobileQRScanner {
     parseGuestName(responseText) {
         const match = responseText.match(/Bienvenido\\s+(.+)/);
         return match ? match[1].trim() : null;
+    }
+
+    // 🔊 ==================== FUNCIONES DE AUDIO ====================
+    
+    // 🔊 Sonido de éxito - Tono ascendente alegre (Do-Mi-Sol)
+    playSuccessSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Crear múltiples tonos para un sonido más rico
+            const frequencies = [523, 659, 784]; // Do, Mi, Sol (acorde mayor)
+            
+            frequencies.forEach((freq, index) => {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                // Configurar oscilador
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+                
+                // Configurar ganancia con fade in/out
+                const startTime = audioContext.currentTime + (index * 0.1);
+                const duration = 0.4;
+                
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(0.15, startTime + 0.05);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                
+                // Conectar nodos
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                // Reproducir
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
+            });
+            
+            console.log('🔊 Reproduciendo sonido de éxito');
+        } catch (error) {
+            console.log('🔇 Audio no disponible:', error);
+        }
+    }
+
+    // 🚨 Sonido de error - Tono descendente de alerta
+    playErrorSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Crear sonido de error con dos tonos descendentes
+            const oscillator1 = audioContext.createOscillator();
+            const oscillator2 = audioContext.createOscillator();
+            const gainNode1 = audioContext.createGain();
+            const gainNode2 = audioContext.createGain();
+            
+            // Primer tono - más alto
+            oscillator1.type = 'square';
+            oscillator1.frequency.setValueAtTime(400, audioContext.currentTime);
+            oscillator1.frequency.exponentialRampToValueAtTime(300, audioContext.currentTime + 0.3);
+            
+            // Segundo tono - más bajo, ligeramente desfasado
+            oscillator2.type = 'square';
+            oscillator2.frequency.setValueAtTime(350, audioContext.currentTime + 0.1);
+            oscillator2.frequency.exponentialRampToValueAtTime(250, audioContext.currentTime + 0.4);
+            
+            // Configurar ganancia para ambos tonos
+            gainNode1.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            gainNode2.gain.setValueAtTime(0, audioContext.currentTime + 0.1);
+            gainNode2.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.15);
+            gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            
+            // Conectar nodos
+            oscillator1.connect(gainNode1);
+            oscillator2.connect(gainNode2);
+            gainNode1.connect(audioContext.destination);
+            gainNode2.connect(audioContext.destination);
+            
+            // Reproducir
+            oscillator1.start(audioContext.currentTime);
+            oscillator1.stop(audioContext.currentTime + 0.3);
+            
+            oscillator2.start(audioContext.currentTime + 0.1);
+            oscillator2.stop(audioContext.currentTime + 0.4);
+            
+            console.log('🚨 Reproduciendo sonido de error');
+        } catch (error) {
+            console.log('🔇 Audio no disponible:', error);
+        }
+    }
+
+    // 🎵 Sonido de notificación - Para duplicados
+    playNotificationSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            // Configurar oscilador para sonido neutral
+            oscillator.type = 'triangle';
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+            oscillator.frequency.setValueAtTime(500, audioContext.currentTime + 0.2);
+            
+            // Configurar ganancia
+            gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            // Conectar nodos
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Reproducir
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+            
+            console.log('🎵 Reproduciendo sonido de notificación');
+        } catch (error) {
+            console.log('🔇 Audio no disponible:', error);
+        }
+    }
+
+    // 📳 Vibración para dispositivos móviles
+    vibrate(pattern = [100, 50, 100]) {
+        try {
+            if (navigator.vibrate) {
+                navigator.vibrate(pattern);
+                console.log('📳 Vibrando dispositivo');
+            }
+        } catch (error) {
+            console.log('📳 Vibración no disponible:', error);
+        }
+    }
+
+    // 🎵 Inicializar contexto de audio (requerido por algunos navegadores)
+    initializeAudio() {
+        try {
+            // Crear contexto de audio silencioso para "despertar" el audio
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Algunos navegadores requieren interacción del usuario primero
+            if (this.audioContext.state === 'suspended') {
+                const resumeAudio = () => {
+                    this.audioContext.resume().then(() => {
+                        console.log('🎵 Contexto de audio activado');
+                        document.removeEventListener('touchstart', resumeAudio);
+                        document.removeEventListener('click', resumeAudio);
+                    });
+                };
+                
+                document.addEventListener('touchstart', resumeAudio, { once: true });
+                document.addEventListener('click', resumeAudio, { once: true });
+            }
+        } catch (error) {
+            console.log('🔇 No se pudo inicializar el contexto de audio:', error);
+        }
     }
     
     showGuestCard(guestInfo) {
