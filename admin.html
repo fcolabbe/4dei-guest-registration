@@ -821,7 +821,7 @@
 
                 // File upload
                 document.getElementById('excelFile').addEventListener('change', (e) => {
-                    this.handleFileSelect(e);
+                    handleFileSelect(e);
                 });
             }
 
@@ -1151,6 +1151,9 @@
 
         // Initialize admin panel
         const adminPanel = new MobileAdminPanel();
+        
+        // Make adminPanel globally available
+        window.adminPanel = adminPanel;
 
         // Close modals when clicking outside
         window.onclick = function(event) {

@@ -157,7 +157,7 @@ app.get('/', (req, res) => {
 });
 
 // Endpoint para importar Excel
-app.post('/api/import-excel', upload.single('excelFile'), async (req, res) => {
+app.post('/api/import-excel', upload.single('excel'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
